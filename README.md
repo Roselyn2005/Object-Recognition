@@ -1,51 +1,65 @@
-# Object-Recognition
-This project demonstrates real-time object detection using the YOLOv4 (You Only Look Once) deep learning model with OpenCV's DNN module and a webcam feed.
+import cv2
+import numpy as np
 
-Features:
-Utilizes the YOLOv4 model for high-speed, high-accuracy object detection.
-
-Performs detection on a live webcam stream.
-
-Draws bounding boxes and labels for detected objects using the COCO dataset classes.
-
-Implements Non-Maximum Suppression (NMS) to eliminate redundant overlapping boxes.
-
-Tech Stack:
-Python
-
-OpenCV
-
-NumPy
-
-YOLOv4 (Pre-trained weights and config)
-
-COCO dataset class labels
-
-Files Used:
-yolov4.weights – Pre-trained YOLOv4 model weights.
-
-yolov4.cfg – YOLOv4 network configuration.
-
-coco.names – List of 80 object class names from the COCO dataset.
-
-How It Works:
-The webcam captures real-time video frames.
-
-Each frame is converted into a blob and passed through the YOLOv4 network.
-
-The model detects objects and outputs bounding box coordinates, class probabilities, and class IDs.
-
-Results are filtered using confidence thresholding and non-maximum suppression.
-
-Detected objects are highlighted with bounding boxes and labels in the live video feed.
-
-How to Run:
-Download the YOLOv4 weights, config, and coco.names file.
-
-Make sure OpenCV and NumPy are installed.
-
-Run the Python script and allow access to your webcam.
-
-Press 'q' to quit or close the video window.
+net = cv2.dnn.readNet("C:/Users/91879/Downloads/yolov4.weights", "C:/Users/91879/Downloads/yolov4.cfg")
+layer_names = net.getLayerNames()
+output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers().flatten()]
 
 
+with open("C:/Users/91879/Downloads/coco.names", "r") as f:
+    classes = [line.strip() for line in f.readlines()]
+
+
+cap = cv2.VideoCapture(0)
+
+while True:
+   
+    ret, frame = cap.read()
+    height, width, channels = frame.shape
+
+    
+    blob = cv2.dnn.blobFromImage(frame, 0.00392, (416, 416), (0, 0, 0), True, crop=False)
+    net.setInput(blob)
+    outputs = net.forward(output_layers)
+
+  
+    boxes, confidences, class_ids = [], [], []
+
+   
+    for output in outputs:
+        for detection in output:
+            scores = detection[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+            if confidence > 0.5:
+                center_x = int(detection[0] * width)
+                center_y = int(detection[1] * height)
+                w = int(detection[2] * width)
+                h = int(detection[3] * height)
+                x = int(center_x - w / 2)
+                y = int(center_y - h / 2)
+                boxes.append([x, y, w, h])
+                confidences.append(float(confidence))
+                class_ids.append(class_id)
+
+   
+    indexes = cv2.dnn.NMSBoxes(boxes, confidences, 0.5, 0.4)
+
+
+    for i in range(len(boxes)):
+        if i in indexes:
+            x, y, w, h = boxes[i]
+            label = str(classes[class_ids[i]])
+            color = (0, 255, 0)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+    cv2.imshow("Object Detection", frame)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+    if cv2.getWindowProperty("Object Detection", cv2.WND_PROP_VISIBLE) < 1:  # Detect window close
+        break
+
+cap.release()
+cv2.destroyAllWindows()
